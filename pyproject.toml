@@ -1,0 +1,13 @@
+[project]
+name = "onionchat"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "jinja2",
+    "python-multipart",
+    "uvicorn",
+]
+
+[dependency-groups]
+dev = ["httpx", "pytest", "pytest-asyncio"]
