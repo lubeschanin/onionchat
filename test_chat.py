@@ -236,3 +236,22 @@ async def test_notify_wakes_waiters():
     chat.notify()
     await task
     assert triggered
+
+
+# --- Status ---
+
+
+@pytest.mark.anyio
+async def test_status_empty(client):
+    r = await client.get("/status")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["streams"] == 0
+    assert data["messages"] == 0
+
+
+@pytest.mark.anyio
+async def test_status_with_messages(client):
+    await client.post("/send", data={"msg": "hi"})
+    r = await client.get("/status")
+    assert r.json()["messages"] == 1

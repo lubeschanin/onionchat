@@ -110,6 +110,7 @@ def get_or_set_nick(request: Request, response: Response) -> str:
     nick = request.cookies.get("nick")
     if not nick or not NICK_RE.match(nick):
         nick = make_nick()
+        # No Secure flag: server binds 127.0.0.1 (plain HTTP), Tor encrypts the transport.
         response.set_cookie("nick", nick, httponly=True, samesite="strict")
     return nick
 
@@ -265,9 +266,17 @@ async def send(request: Request, msg: str = Form("")):
     return response
 
 
+@app.get("/status", response_class=HTMLResponse)
+async def status():
+    return HTMLResponse(f'{{"streams":{active_streams},"messages":{len(messages)}}}',
+                        media_type="application/json")
+
+
 @app.get("/clear")
 async def clear(secret: str = ""):
     if secrets.compare_digest(secret, CLEAR_SECRET):
+        # msg_counter is intentionally NOT reset — streaming generators track
+        # last_id, so a reset would cause them to miss new messages.
         messages.clear()
     return RedirectResponse("/", status_code=303)
 
