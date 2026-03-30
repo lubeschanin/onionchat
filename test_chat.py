@@ -1,7 +1,6 @@
 """Tests for onionchat."""
 
 import asyncio
-import inspect
 import re
 import time
 
