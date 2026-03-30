@@ -185,6 +185,37 @@ async def test_clear_correct_secret(client):
     assert len(chat.messages) == 0
 
 
+@pytest.mark.anyio
+async def test_clear_preserves_msg_counter(client):
+    await client.post("/send", data={"msg": "before"})
+    counter_before = chat.msg_counter
+    await client.get(f"/clear?secret={chat.CLEAR_SECRET}", follow_redirects=False)
+    assert chat.msg_counter == counter_before
+    chat.last_sent.clear()
+    await client.post("/send", data={"msg": "after"})
+    assert chat.messages[0]["id"] == counter_before
+
+
+# --- Body limit ---
+
+
+@pytest.mark.anyio
+async def test_body_limit_rejects_large_post(client):
+    r = await client.post("/send", data={"msg": "A" * 3000}, follow_redirects=False)
+    assert r.status_code == 413
+
+
+# --- Rate limit cleanup ---
+
+
+def test_clean_rate_limits():
+    chat.last_sent["old"] = time.monotonic() - 10
+    chat.last_sent["new"] = time.monotonic()
+    chat._clean_rate_limits()
+    assert "old" not in chat.last_sent
+    assert "new" in chat.last_sent
+
+
 # --- Security headers ---
 
 

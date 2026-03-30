@@ -41,21 +41,31 @@ class BodyLimitMiddleware:
             return await self.app(scope, receive, send)
 
         received = 0
+        too_large = False
+        sent_413 = False
 
         async def limited_receive():
-            nonlocal received
+            nonlocal received, too_large
             message = await receive()
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
                 if received > MAX_BODY:
-                    raise ValueError("body too large")
+                    too_large = True
+                    return {"type": "http.request", "body": b"", "more_body": False}
             return message
 
-        try:
-            await self.app(scope, limited_receive, send)
-        except ValueError:
-            await send({"type": "http.response.start", "status": 413, "headers": []})
-            await send({"type": "http.response.body", "body": b"", "more_body": False})
+        async def checked_send(message):
+            nonlocal sent_413
+            if too_large and not sent_413:
+                sent_413 = True
+                await send({"type": "http.response.start", "status": 413, "headers": []})
+                await send({"type": "http.response.body", "body": b"", "more_body": False})
+                return
+            if sent_413:
+                return
+            await send(message)
+
+        await self.app(scope, limited_receive, checked_send)
 
 
 SECURITY_HEADERS: list[tuple[bytes, bytes]] = [
