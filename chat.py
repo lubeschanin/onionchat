@@ -82,7 +82,7 @@ SECURITY_HEADERS: list[tuple[bytes, bytes]] = [
     (b"cache-control", b"no-store"),
     (b"permissions-policy", b"camera=(), microphone=(), geolocation=(), interest-cohort=()"),
     (b"content-security-policy",
-     b"default-src 'none'; style-src 'unsafe-inline'; frame-src 'self'; form-action 'self'"),
+     b"default-src 'none'; style-src 'unsafe-inline'; frame-src 'self'; form-action 'self'; img-src 'self'"),
     (b"server", b"onionchat"),
 ]
 
@@ -204,6 +204,11 @@ async def index(request: Request):
     response = templates.TemplateResponse(request, "chat.html")
     get_or_set_nick(request, response)
     return response
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    return Response(status_code=204)
 
 
 @app.get("/clock", response_class=HTMLResponse)
