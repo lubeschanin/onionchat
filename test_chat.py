@@ -154,6 +154,25 @@ async def test_rate_limit_expires(client):
     assert len(chat.messages) == 2
 
 
+@pytest.mark.anyio
+async def test_duplicate_message_dropped(client):
+    client.cookies.set("nick", "Owl-cc33")
+    await client.post("/send", data={"msg": "spam"})
+    chat.last_sent["Owl-cc33"] -= chat.RATE_LIMIT
+    await client.post("/send", data={"msg": "spam"})
+    assert len(chat.messages) == 1
+
+
+@pytest.mark.anyio
+async def test_duplicate_from_different_nick_allowed(client):
+    client.cookies.set("nick", "Fox-dd44")
+    await client.post("/send", data={"msg": "hello"})
+    client.cookies.set("nick", "Owl-ee55")
+    chat.last_sent.clear()
+    await client.post("/send", data={"msg": "hello"})
+    assert len(chat.messages) == 2
+
+
 # --- Nickname validation ---
 
 
