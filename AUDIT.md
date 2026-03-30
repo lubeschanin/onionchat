@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-30
 **Type:** Self-audit (not an independent security review)
-**Scope:** `chat.py` (352 lines), `templates/chat.html` (23 lines), `test_chat.py` (377 lines)
+**Scope:** `chat.py` (346 lines), `templates/chat.html` (30 lines), `test_chat.py` (378 lines)
 **Threat model:** Anonymous chat over Tor. Adversaries: malicious chat participants, network observers, automated scanners.
 
 ### Confidence levels

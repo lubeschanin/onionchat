@@ -56,10 +56,11 @@ async def test_index(client):
 
 
 @pytest.mark.anyio
-async def test_input(client):
-    r = await client.get("/input")
+async def test_index_has_form(client):
+    r = await client.get("/")
     assert r.status_code == 200
     assert 'name="msg"' in r.text
+    assert "autofocus" in r.text
 
 
 @pytest.mark.anyio

@@ -168,15 +168,35 @@ def _clean_rate_limits():
         del last_sent[k]
 
 
-MSG_HEAD = (
-    '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><style>'
-    '*{margin:0;padding:0;box-sizing:border-box}'
-    'body{background:#0d0d0d;color:#c0c0c0;font-family:monospace;font-size:14px;padding:12px;'
-    'scrollbar-color:#222 #0d0d0d;scrollbar-width:thin}'
-    '.msg{margin-bottom:4px;word-wrap:break-word}'
-    '.msg .ts{color:#666}.msg .nick{color:#888;font-weight:bold}.msg .text{color:#00cc66}'
-    '</style></head><body>\n'
-)
+MSG_HEAD = """<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: #0d0d0d; }
+  #s {
+    height: 100%;
+    display: flex;
+    flex-direction: column-reverse;
+    overflow-y: auto;
+    scrollbar-color: #222 #0d0d0d;
+    scrollbar-width: thin;
+  }
+  #m {
+    color: #c0c0c0;
+    font-family: monospace;
+    font-size: 14px;
+    padding: 12px;
+    flex-shrink: 0;
+  }
+  .msg { margin-bottom: 4px; word-wrap: break-word; }
+  .msg .ts { color: #666; }
+  .msg .nick { color: #888; font-weight: bold; }
+  .msg .text { color: #00cc66; }
+</style>
+</head>
+<body><div id="s"><div id="m">
+"""
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -251,36 +271,10 @@ async def msg_feed(request: Request):
     return StreamingResponse(generate(), media_type="text/html")
 
 
-INPUT_HTML = (
-    '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
-    '*{margin:0;padding:0;box-sizing:border-box}'
-    'body{background:#111}'
-    'form{display:flex;gap:8px;padding:8px 12px}'
-    'input[type=text]{flex:1;background:#0d0d0d;color:#00cc66;border:1px solid #333;'
-    'padding:8px;font-family:monospace;font-size:14px;outline:none}'
-    'input[type=text]:focus{border-color:#00cc66}'
-    'button{background:#00cc66;color:#0d0d0d;border:none;padding:8px 16px;'
-    'font-family:monospace;font-size:14px;font-weight:bold;cursor:pointer}'
-    'button:hover{background:#00ff7f}'
-    '</style></head><body>'
-    '<form action="/send" method="post" autocomplete="off">'
-    f'<input type="text" name="msg" placeholder="Message..." maxlength="{MAX_MSG_LEN}" autofocus>'
-    '<button type="submit">&gt;</button>'
-    '</form></body></html>'
-)
-
-
-@app.get("/input", response_class=HTMLResponse)
-async def input_form(request: Request):
-    response = HTMLResponse(INPUT_HTML)
-    get_or_set_nick(request, response)
-    return response
-
-
 @app.post("/send")
 async def send(request: Request, msg: str = Form("")):
     global msg_counter
-    response = RedirectResponse("/input", status_code=303)
+    response = RedirectResponse("/", status_code=303)
     nick = get_or_set_nick(request, response)
     text = msg.strip()[:MAX_MSG_LEN]
     now = time.monotonic()

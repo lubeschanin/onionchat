@@ -21,13 +21,12 @@ Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/). Starts on `127.0.0.1
 ```
 Browser                          Server (127.0.0.1:8181)
   |                                |
-  |-- GET / ---------------------->|  Main layout (iframes)
+  |-- GET / ---------------------->|  Main page (form + chat iframe)
   |-- GET /messages -------------->|  Streaming HTML (open connection)
-  |-- GET /input ----------------->|  Input form
   |-- GET /clock ----------------->|  UTC clock (auto-refresh 30s)
   |                                |
   |-- POST /send ----------------->|  Append message, notify streams
-  |<-- 303 -> /input --------------|  Input iframe reloads (field clears)
+  |<-- 303 -> / ------------------|  Page reloads (fade-in, autofocus)
   |                                |
   |   <-- new <div> chunks --------|  All streams get the new message
 ```
@@ -47,14 +46,13 @@ Messages are pushed via HTTP streaming (`StreamingResponse`). No polling, no ref
 
 The UI uses iframes to work around HTML limitations without JS:
 
-| Frame | Endpoint | Purpose |
+| Component | Endpoint | Purpose |
 |---|---|---|
-| Main page | `GET /` | Outer shell, loads once, never reloads |
+| Main page | `GET /` | Layout with form + chat iframe, reloads on send (fade-in transition) |
 | Chat | `GET /messages` | Streaming response — stays open, receives new messages as HTML chunks |
-| Input | `GET /input` | Form — reloads on submit to clear the field |
-| Clock | `GET /clock` | UTC time, auto-refreshes every 30s |
+| Clock | `GET /clock` | UTC date and time, auto-refreshes every 30s |
 
-**Why iframes?** Without JS, there's no way to update part of a page. The chat iframe streams new messages without refreshing. The input iframe reloads on submit to clear the field. The main page never reloads. This gives a smooth chat experience with zero JavaScript.
+**Why an iframe for chat?** Without JS, there's no way to update part of a page. The chat iframe streams new messages via HTTP streaming. On send, the main page reloads with a CSS fade-in to mask the transition. Auto-scroll via `flex-direction: column-reverse` keeps newest messages visible.
 
 **Why HTTP streaming over meta-refresh?** Meta-refresh reloads the entire page every N seconds, causing flicker and interrupting typing. HTTP streaming keeps the connection open and pushes new HTML chunks on demand — instant delivery, no flicker.
 
@@ -107,7 +105,6 @@ cat /var/lib/tor/onionchat/hostname
 |---|---|---|
 | `GET` | `/` | Main page |
 | `GET` | `/messages` | Streaming message feed (long-lived connection) |
-| `GET` | `/input` | Input form |
 | `GET` | `/clock` | Date and time (YYYY-MM-DD HH:MM UTC) |
 | `POST` | `/send` | Send a message (form data: `msg`) |
 | `GET` | `/api/messages` | JSON array of all messages (ISO 8601 timestamps) |
@@ -169,7 +166,7 @@ uv run pytest
 
 ```
 onionchat/
-├── chat.py              # Server (352 lines)
+├── chat.py              # Server (346 lines)
 ├── test_chat.py         # Tests (34 tests)
 ├── templates/
 │   └── chat.html        # Outer layout (iframe shell)
