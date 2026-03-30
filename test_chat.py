@@ -164,6 +164,15 @@ async def test_duplicate_message_dropped(client):
 
 
 @pytest.mark.anyio
+async def test_duplicate_after_delay_allowed(client):
+    client.cookies.set("nick", "Owl-cc33")
+    await client.post("/send", data={"msg": "ping"})
+    chat.last_sent["Owl-cc33"] = time.monotonic() - 31
+    await client.post("/send", data={"msg": "ping"})
+    assert len(chat.messages) == 2
+
+
+@pytest.mark.anyio
 async def test_duplicate_from_different_nick_allowed(client):
     client.cookies.set("nick", "Fox-dd44")
     await client.post("/send", data={"msg": "hello"})
