@@ -317,16 +317,16 @@ async def api_status():
             "message_buffer": messages.maxlen,
         },
         "hardening": {
-            "access_log": False,
-            "server_header_masked": True,
-            "docs_disabled": True,
+            "docs_disabled": app.docs_url is None,
             "csp": "default-src 'none'",
             "xss_escaping": True,
             "cookie_httponly": True,
             "cookie_samesite": "strict",
             "cookie_secure": False,
-            "constant_time_secret": True,
         },
+        "note": "Hardening shows app-level settings only. Server-level settings "
+                "(access_log, server_header) depend on how uvicorn is started. "
+                "Use ./start.sh or chat.py __main__ for the hardened defaults.",
     }
 
 

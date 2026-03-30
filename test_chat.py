@@ -332,8 +332,9 @@ async def test_api_status_empty(client):
     assert data["messages"] == 0
     assert data["limits"]["max_streams"] == chat.MAX_STREAMS
     assert data["limits"]["max_message_length"] == chat.MAX_MSG_LEN
-    assert data["hardening"]["access_log"] is False
+    assert data["hardening"]["docs_disabled"] is True
     assert data["hardening"]["cookie_secure"] is False
+    assert "note" in data
 
 
 @pytest.mark.anyio
