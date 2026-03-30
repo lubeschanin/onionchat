@@ -106,9 +106,9 @@ cat /var/lib/tor/onionchat/hostname
 | `GET` | `/` | Main page |
 | `GET` | `/messages` | Streaming message feed (long-lived connection) |
 | `GET` | `/input` | Input form |
-| `GET` | `/clock` | UTC clock |
+| `GET` | `/clock` | Date and time (YYYY-MM-DD HH:MM UTC) |
 | `POST` | `/send` | Send a message (form data: `msg`) |
-| `GET` | `/api/messages` | JSON array of all messages |
+| `GET` | `/api/messages` | JSON array of all messages (ISO 8601 timestamps) |
 | `GET` | `/api/status` | JSON: `{"streams": N, "messages": N}` |
 | `GET` | `/clear?secret=<s>` | Clear all messages (operator only) |
 

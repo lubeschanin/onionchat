@@ -1,6 +1,7 @@
 """Tests for onionchat."""
 
 import asyncio
+import re
 import time
 
 import pytest
@@ -63,6 +64,7 @@ async def test_clock(client):
     r = await client.get("/clock")
     assert r.status_code == 200
     assert "UTC" in r.text
+    assert re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC", r.text)
 
 
 # --- Send & receive ---
@@ -123,7 +125,7 @@ async def test_message_truncated(client):
 
 def test_ring_buffer():
     for i in range(250):
-        chat.messages.append({"id": i, "nick": "X-0000", "time": "00:00", "text": str(i)})
+        chat.messages.append({"id": i, "nick": "X-0000", "time": "2026-01-01T00:00Z", "text": str(i)})
     assert len(chat.messages) == 200
     assert chat.messages[0]["id"] == 50
 
@@ -272,7 +274,7 @@ async def test_api_messages(client):
     assert len(data) == 1
     assert data[0]["text"] == "hello"
     assert "nick" in data[0]
-    assert "time" in data[0]
+    assert re.match(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z", data[0]["time"])
 
 
 @pytest.mark.anyio
@@ -280,3 +282,11 @@ async def test_api_messages_no_id_leak(client):
     await client.post("/send", data={"msg": "test"})
     r = await client.get("/api/messages")
     assert "id" not in r.json()[0]
+
+
+@pytest.mark.anyio
+async def test_render_msg_shows_only_hhmm():
+    m = {"id": 0, "nick": "Fox-ab12", "time": "2026-03-30T15:23Z", "text": "hi"}
+    html = chat.render_msg(m)
+    assert "15:23" in html
+    assert "2026" not in html

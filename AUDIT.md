@@ -95,7 +95,7 @@ Adding rate limiting here would be complexity with zero practical benefit for th
 | Server fingerprint | **PASS** | `server_header=False` + custom `Server: onionchat` |
 | OpenAPI/docs | **PASS** | `docs_url=None, redoc_url=None, openapi_url=None` |
 | Referrer leakage | **PASS** | `Referrer-Policy: no-referrer` |
-| Timezone leakage | **PASS** | All timestamps UTC (`datetime.now(timezone.utc)`) |
+| Timezone leakage | **PASS** | All timestamps UTC. Stored as ISO 8601 (`2026-03-30T15:23Z`), UI shows only `HH:MM`. |
 | Error pages | **PASS** | FastAPI default error handler, no stack traces in production |
 | Cache leakage | **PASS** | `Cache-Control: no-store` on all responses |
 | External requests | **PASS** | No CDN, no fonts, no analytics, no external resources. CSP `default-src 'none'` enforces this. |
@@ -146,7 +146,7 @@ Adding rate limiting here would be complexity with zero practical benefit for th
 
 | Endpoint | Method | Auth | Response |
 |---|---|---|---|
-| `/api/messages` | `GET` | None | `[{"nick", "time", "text"}, ...]` |
+| `/api/messages` | `GET` | None | `[{"nick", "time" (ISO 8601), "text"}, ...]` |
 | `/api/status` | `GET` | None | `{"streams": N, "messages": N}` |
 
 Both endpoints are public and read-only. No internal state (`id`, `msg_counter`) is exposed.

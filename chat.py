@@ -133,9 +133,10 @@ def notify():
 
 
 def render_msg(m: dict) -> str:
+    hhmm = escape(m["time"][11:16])
     return (
         f'<div class="msg">'
-        f'<span class="ts">{escape(m["time"])}</span> '
+        f'<span class="ts">{hhmm}</span> '
         f'<span class="nick">{escape(m["nick"])}</span> '
         f'<span class="text">{escape(m["text"])}</span>'
         f'</div>\n'
@@ -170,7 +171,7 @@ async def index(request: Request):
 
 @app.get("/clock", response_class=HTMLResponse)
 async def clock():
-    now = datetime.now(timezone.utc).strftime("%H:%M UTC")
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     return HTMLResponse(
         '<!DOCTYPE html><html><head><meta charset="utf-8">'
         '<meta http-equiv="refresh" content="30">'
@@ -266,7 +267,7 @@ async def send(request: Request, msg: str = Form("")):
         messages.append({
             "id": msg_counter,
             "nick": nick,
-            "time": datetime.now(timezone.utc).strftime("%H:%M"),
+            "time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
             "text": text,
         })
         msg_counter += 1
