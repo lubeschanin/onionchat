@@ -1,7 +1,7 @@
 # Security Audit — onionchat
 
-**Date:** 2026-03-29
-**Scope:** `chat.py` (304 lines), `templates/chat.html` (23 lines), `test_chat.py` (257 lines)
+**Date:** 2026-03-30
+**Scope:** `chat.py` (308 lines), `templates/chat.html` (23 lines), `test_chat.py` (282 lines)
 **Threat model:** Anonymous chat over Tor. Adversaries: malicious chat participants, network observers, automated scanners.
 
 ---
@@ -60,10 +60,21 @@
 | Memory via messages | `deque(maxlen=200)` ring buffer | 200 messages max |
 | Memory via rate-limit dict | `_clean_rate_limits()` called when >256 entries | Entries >2s old evicted |
 
+### `/api/messages` — no rate limit (intentional)
+
+The JSON API has no server-side rate limiting. Rationale:
+
+- **Tor is the rate limiter.** 200-1000ms latency per circuit. A tight polling loop yields 1-5 req/s at most.
+- **Read-only, bounded payload.** 200 messages x ~100 bytes = ~20 KB max. Serialization cost is negligible.
+- **No state mutation.** Hammering the endpoint affects only the caller, not other users.
+- **Streaming is the real consumer.** `/messages` holds open connections indefinitely — that's where `MAX_STREAMS` matters. `/api/messages` is fire-and-forget.
+
+Adding rate limiting here would be complexity with zero practical benefit for this threat model.
+
 ### Stream counter correctness
 
-- `active_streams += 1` inside generator's `try` block (line 190)
-- `active_streams -= 1` in `finally` block (line 215)
+- `active_streams += 1` inside generator's `try` block (line 201)
+- `active_streams -= 1` in `finally` block (line 226)
 - Single-threaded asyncio — no race conditions
 - Generator cleanup guaranteed by ASGI server on client disconnect
 
@@ -88,11 +99,13 @@
 | Error pages | **PASS** | FastAPI default error handler, no stack traces in production |
 | Cache leakage | **PASS** | `Cache-Control: no-store` on all responses |
 | External requests | **PASS** | No CDN, no fonts, no analytics, no external resources. CSP `default-src 'none'` enforces this. |
+| Internal ID leakage | **PASS** | `/api/messages` strips internal `id` field, returns only `nick`, `time`, `text` |
 
 ### Test coverage
 
 - `test_docs_disabled` — verifies `/docs`, `/redoc`, `/openapi.json` return 404
 - `test_security_headers` — verifies server header is `onionchat`
+- `test_api_messages_no_id_leak` — verifies internal `id` not exposed in JSON API
 
 ---
 
@@ -100,7 +113,7 @@
 
 | Concern | Status | Detail |
 |---|---|---|
-| Nickname spoofing | **MITIGATED** | Cookie is `httponly` + `samesite=strict`. Cannot be read or set by other origins. Server validates format. |
+| Nickname spoofing | **MITIGATED** | Cookie is `httponly` + `samesite=strict`. Cannot be read or set by other origins. Server validates format. No `Secure` flag because server binds `127.0.0.1` (plain HTTP) — Tor encrypts the transport. |
 | Clear endpoint | **PASS** | Protected by `CLEAR_SECRET` with constant-time comparison. Secret generated via `secrets.token_hex(8)` (64 bits of entropy). |
 | Session fixation | **N/A** | No sessions. Cookie is a display name only, not an auth token. |
 
@@ -121,7 +134,7 @@
 | Event notification | **PASS** | `notify()` replaces `msg_event` and sets old. Generators capture event reference before `await`. No missed notifications. |
 | Deque iteration | **PASS** | `list(messages)` snapshots before iterating. Safe against concurrent modification. |
 | `msg_counter` overflow | **PASS** | Python `int` has arbitrary precision. No overflow possible. |
-| `/clear` + streaming | **PASS** | After `messages.clear()`, `msg_counter` is not reset. New messages get higher IDs. Existing streams continue correctly. |
+| `/clear` + streaming | **PASS** | After `messages.clear()`, `msg_counter` is intentionally not reset. New messages get higher IDs. Existing streams continue correctly. |
 
 ### Test coverage
 
@@ -129,7 +142,26 @@
 
 ---
 
-## 7. Remaining Risks (accepted)
+## 7. JSON API
+
+| Endpoint | Method | Auth | Response |
+|---|---|---|---|
+| `/api/messages` | `GET` | None | `[{"nick", "time", "text"}, ...]` |
+| `/api/status` | `GET` | None | `{"streams": N, "messages": N}` |
+
+Both endpoints are public and read-only. No internal state (`id`, `msg_counter`) is exposed.
+
+### Test coverage
+
+- `test_api_status_empty` — verifies zeroed status on fresh start
+- `test_api_status_with_messages` — verifies message counter after send
+- `test_api_messages_empty` — verifies empty array
+- `test_api_messages` — verifies message fields present
+- `test_api_messages_no_id_leak` — verifies internal `id` not exposed
+
+---
+
+## 8. Remaining Risks (accepted)
 
 | Risk | Severity | Rationale |
 |---|---|---|
@@ -138,10 +170,11 @@
 | No CSRF protection on `/send` | **Low** | `SameSite=Strict` cookie prevents cross-origin form submission. CSP `form-action 'self'` adds defense in depth. |
 | Streaming connection drop | **Low** | If the stream drops silently (no `is_disconnected` trigger), the generator leaks until the next ping timeout (30s). `finally` block then cleans up. |
 | `last_sent` cleanup timing | **Low** | Cleanup only fires at >256 entries. In theory, 256 nicks sending exactly 1 msg each would persist until threshold. Bounded and harmless. |
+| API polling | **Low** | `/api/messages` has no rate limit. Tor latency (200-1000ms) is the natural throttle. Payload bounded at ~20 KB. Read-only, no amplification. |
 
 ---
 
-## 8. Dependency Surface
+## 9. Dependency Surface
 
 | Package | Purpose | Risk |
 |---|---|---|
@@ -156,10 +189,10 @@ No external runtime requests. No CDN. No telemetry. Attack surface limited to in
 
 ---
 
-## 9. Test Summary
+## 10. Test Summary
 
 ```
-24 tests, 0.25s
+27 tests, 0.26s
 
 Nickname:       test_make_nick_format, test_make_nick_unique
 Pages:          test_index, test_input, test_clock
@@ -173,12 +206,14 @@ Clear:          test_clear_wrong_secret, test_clear_correct_secret
 Headers:        test_security_headers
 Docs:           test_docs_disabled
 Streams:        test_stream_limit
-Status:         test_status_empty, test_status_with_messages
 Events:         test_notify_wakes_waiters
+API:            test_api_status_empty, test_api_status_with_messages,
+                test_api_messages_empty, test_api_messages,
+                test_api_messages_no_id_leak
 ```
 
 ---
 
-## 10. Verdict
+## 11. Verdict
 
 The codebase is minimal, hardened, and fit for purpose. No critical or high-severity issues found. The accepted low-severity risks are reasonable tradeoffs for the threat model (anonymous Tor chat, no persistent state, no authentication).

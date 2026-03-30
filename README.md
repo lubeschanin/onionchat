@@ -38,6 +38,7 @@ Messages are pushed via HTTP streaming (`StreamingResponse`). No polling, no ref
 - **Anonymous nicknames** — randomly generated on first visit (e.g. `Shadow-7a3b`), stored in cookie
 - **Real-time delivery** — messages pushed via `asyncio.Event`, not polling
 - **Ephemeral** — in-memory ring buffer (200 messages). Process dies, everything is gone. That's the point.
+- **JSON API** — `GET /api/messages` and `GET /api/status` for programmatic access
 - **Hardened** — CSP, rate limiting, body size limit, constant-time secret comparison ([full audit](AUDIT.md))
 
 ## Architecture
@@ -107,7 +108,8 @@ cat /var/lib/tor/onionchat/hostname
 | `GET` | `/input` | Input form |
 | `GET` | `/clock` | UTC clock |
 | `POST` | `/send` | Send a message (form data: `msg`) |
-| `GET` | `/status` | JSON: `{"streams": N, "messages": N}` |
+| `GET` | `/api/messages` | JSON array of all messages |
+| `GET` | `/api/status` | JSON: `{"streams": N, "messages": N}` |
 | `GET` | `/clear?secret=<s>` | Clear all messages (operator only) |
 
 ## Security
@@ -157,14 +159,14 @@ Full security audit: [`AUDIT.md`](AUDIT.md)
 uv run pytest
 ```
 
-24 tests covering XSS, rate limiting, cookie validation, security headers, stream limits, and more.
+27 tests covering XSS, rate limiting, cookie validation, security headers, stream limits, API endpoints, and more.
 
 ## Project structure
 
 ```
 onionchat/
-├── chat.py              # Server (304 lines)
-├── test_chat.py         # Tests (24 tests)
+├── chat.py              # Server (308 lines)
+├── test_chat.py         # Tests (27 tests)
 ├── templates/
 │   └── chat.html        # Outer layout (iframe shell)
 ├── pyproject.toml

@@ -242,8 +242,8 @@ async def test_notify_wakes_waiters():
 
 
 @pytest.mark.anyio
-async def test_status_empty(client):
-    r = await client.get("/status")
+async def test_api_status_empty(client):
+    r = await client.get("/api/status")
     assert r.status_code == 200
     data = r.json()
     assert data["streams"] == 0
@@ -251,7 +251,32 @@ async def test_status_empty(client):
 
 
 @pytest.mark.anyio
-async def test_status_with_messages(client):
+async def test_api_status_with_messages(client):
     await client.post("/send", data={"msg": "hi"})
-    r = await client.get("/status")
+    r = await client.get("/api/status")
     assert r.json()["messages"] == 1
+
+
+@pytest.mark.anyio
+async def test_api_messages_empty(client):
+    r = await client.get("/api/messages")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+@pytest.mark.anyio
+async def test_api_messages(client):
+    await client.post("/send", data={"msg": "hello"})
+    r = await client.get("/api/messages")
+    data = r.json()
+    assert len(data) == 1
+    assert data[0]["text"] == "hello"
+    assert "nick" in data[0]
+    assert "time" in data[0]
+
+
+@pytest.mark.anyio
+async def test_api_messages_no_id_leak(client):
+    await client.post("/send", data={"msg": "test"})
+    r = await client.get("/api/messages")
+    assert "id" not in r.json()[0]

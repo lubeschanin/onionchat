@@ -276,10 +276,14 @@ async def send(request: Request, msg: str = Form("")):
     return response
 
 
-@app.get("/status", response_class=HTMLResponse)
-async def status():
-    return HTMLResponse(f'{{"streams":{active_streams},"messages":{len(messages)}}}',
-                        media_type="application/json")
+@app.get("/api/messages")
+async def api_messages():
+    return [{"nick": m["nick"], "time": m["time"], "text": m["text"]} for m in messages]
+
+
+@app.get("/api/status")
+async def api_status():
+    return {"streams": active_streams, "messages": len(messages)}
 
 
 @app.get("/clear")
