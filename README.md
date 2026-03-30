@@ -111,12 +111,14 @@ cat /var/lib/tor/onionchat/hostname
 | `GET` | `/clock` | Date and time (YYYY-MM-DD HH:MM UTC) |
 | `POST` | `/send` | Send a message (form data: `msg`) |
 | `GET` | `/api/messages` | JSON array of all messages (ISO 8601 timestamps) |
-| `GET` | `/api/status` | JSON: `{"streams": N, "messages": N}` |
+| `GET` | `/api/status` | JSON: streams, messages, limits, hardening config |
 | `GET` | `/clear?secret=<s>` | Clear all messages (operator only) |
 
 ## Security
 
-Full security audit: [`AUDIT.md`](AUDIT.md)
+Full security self-audit: [`AUDIT.md`](AUDIT.md)
+
+The `/api/status` endpoint exposes all limits and hardening settings transparently.
 
 ### Headers (all responses)
 
@@ -161,14 +163,14 @@ Full security audit: [`AUDIT.md`](AUDIT.md)
 uv run pytest
 ```
 
-27 tests covering XSS, rate limiting, cookie validation, security headers, stream limits, API endpoints, and more.
+34 tests covering XSS, rate limiting, cookie validation, security headers, stream limits, body limits, API endpoints, and more.
 
 ## Project structure
 
 ```
 onionchat/
-├── chat.py              # Server (308 lines)
-├── test_chat.py         # Tests (27 tests)
+├── chat.py              # Server (352 lines)
+├── test_chat.py         # Tests (34 tests)
 ├── templates/
 │   └── chat.html        # Outer layout (iframe shell)
 ├── pyproject.toml

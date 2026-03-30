@@ -306,7 +306,28 @@ async def api_messages():
 
 @app.get("/api/status")
 async def api_status():
-    return {"streams": active_streams, "messages": len(messages)}
+    return {
+        "streams": active_streams,
+        "messages": len(messages),
+        "limits": {
+            "max_streams": MAX_STREAMS,
+            "max_message_length": MAX_MSG_LEN,
+            "max_body_bytes": MAX_BODY,
+            "rate_limit_seconds": RATE_LIMIT,
+            "message_buffer": messages.maxlen,
+        },
+        "hardening": {
+            "access_log": False,
+            "server_header_masked": True,
+            "docs_disabled": True,
+            "csp": "default-src 'none'",
+            "xss_escaping": True,
+            "cookie_httponly": True,
+            "cookie_samesite": "strict",
+            "cookie_secure": False,
+            "constant_time_secret": True,
+        },
+    }
 
 
 @app.get("/clear")
