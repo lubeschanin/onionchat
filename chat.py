@@ -213,10 +213,10 @@ async def msg_feed(request: Request):
     global active_streams
     if active_streams >= MAX_STREAMS:
         return HTMLResponse(FULL_HTML)
+    active_streams += 1
 
     async def generate():
         global active_streams
-        active_streams += 1
         try:
             yield MSG_HEAD
 

@@ -1,6 +1,7 @@
 """Tests for onionchat."""
 
 import asyncio
+import inspect
 import re
 import time
 
@@ -264,6 +265,34 @@ async def test_stream_limit(client):
     r = await client.get("/messages")
     assert r.status_code == 200
     assert "Chat full" in r.text
+
+
+def test_stream_slot_reserved_before_generator():
+    """Verify active_streams is incremented before StreamingResponse is returned,
+    not inside the generator. This prevents race conditions under concurrent load."""
+    chat.active_streams = 0
+
+    # After msg_feed returns StreamingResponse, active_streams must already be 1
+    # even though the generator hasn't started yet.
+    # We verify this by checking the code structure: the increment is outside the generator.
+    source = inspect.getsource(chat.msg_feed)
+    lines = source.split("\n")
+
+    # Find the increment line and the generator definition
+    increment_line = None
+    generator_line = None
+    for i, line in enumerate(lines):
+        if "active_streams += 1" in line:
+            increment_line = i
+        if "async def generate" in line:
+            generator_line = i
+
+    assert increment_line is not None, "active_streams += 1 not found"
+    assert generator_line is not None, "generator not found"
+    assert increment_line < generator_line, (
+        f"active_streams += 1 (line {increment_line}) must come before "
+        f"async def generate (line {generator_line}) to prevent race conditions"
+    )
 
 
 # --- Notify ---
