@@ -56,6 +56,8 @@ The UI uses iframes to work around HTML limitations without JS:
 
 **Why HTTP streaming over meta-refresh?** Meta-refresh reloads the entire page every N seconds, causing flicker and interrupting typing. HTTP streaming keeps the connection open and pushes new HTML chunks on demand — instant delivery, no flicker.
 
+**Note on CPU usage:** The streaming connection keeps the browser in a "loading" state, which can use 15-20% CPU in Tor Browser. This is inherent to the streaming approach. Press `X` (stop loading) in the browser to pause the stream and reduce CPU — you will still see all messages loaded so far, but won't receive new ones until you reload.
+
 ## Setup
 
 ### Run locally
