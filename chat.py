@@ -96,9 +96,19 @@ app.add_middleware(BodyLimitMiddleware)
 CLEAR_SECRET = os.environ.get("CLEAR_SECRET", secrets.token_hex(8))
 
 WORDS = [
-    "Fox", "Moon", "Wolf", "Star", "Raven", "Mist", "Stone", "Bolt",
-    "Shadow", "Ember", "Thorn", "Ash", "Falcon", "Frost", "Night", "Storm",
-    "Flame", "Oak", "Blade", "Ruin", "Wave", "Thunder", "Ghost", "Root",
+    "Ash", "Bark", "Bear", "Blade", "Blaze", "Bolt", "Bone", "Briar",
+    "Brook", "Cairn", "Cave", "Cinder", "Claw", "Clay", "Cliff", "Cloud",
+    "Coal", "Cobra", "Coral", "Crane", "Creek", "Crow", "Dagger", "Dawn",
+    "Deer", "Drift", "Dune", "Dusk", "Eagle", "Echo", "Ember", "Falcon",
+    "Fang", "Fern", "Flare", "Flame", "Flint", "Fog", "Forge", "Fox",
+    "Frost", "Gale", "Ghost", "Glacier", "Glyph", "Granite", "Grove", "Hail",
+    "Hawk", "Haze", "Hollow", "Hornet", "Iron", "Ivy", "Jackal", "Jade",
+    "Lark", "Lava", "Lichen", "Lynx", "Marsh", "Mist", "Moon", "Moss",
+    "Moth", "Night", "Oak", "Obsidian", "Onyx", "Orca", "Osprey", "Owl",
+    "Peak", "Pebble", "Pine", "Plume", "Quartz", "Raven", "Reed", "Ridge",
+    "Root", "Ruin", "Rust", "Sage", "Shard", "Slate", "Smoke", "Snake",
+    "Spark", "Star", "Stone", "Storm", "Thorn", "Thunder", "Tide", "Viper",
+    "Wave", "Willow", "Wolf", "Wren",
 ]
 
 
