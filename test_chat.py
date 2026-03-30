@@ -17,6 +17,7 @@ def _reset_state():
     chat.msg_counter = 0
     chat.last_sent.clear()
     chat.active_streams = 0
+    chat.msg_event = asyncio.Event()
     yield
 
 
@@ -115,7 +116,6 @@ async def test_xss_escaped(client):
 @pytest.mark.anyio
 async def test_message_truncated(client):
     long_msg = "A" * 1000
-    chat.last_sent.clear()
     await client.post("/send", data={"msg": long_msg})
     assert len(chat.messages[0]["text"]) == chat.MAX_MSG_LEN
 
@@ -203,6 +203,21 @@ async def test_clear_preserves_msg_counter(client):
 async def test_body_limit_rejects_large_post(client):
     r = await client.post("/send", data={"msg": "A" * 3000}, follow_redirects=False)
     assert r.status_code == 413
+
+
+@pytest.mark.anyio
+async def test_body_limit_has_security_headers(client):
+    r = await client.post("/send", data={"msg": "A" * 3000}, follow_redirects=False)
+    assert r.headers["server"] == "onionchat"
+    assert "default-src 'none'" in r.headers["content-security-policy"]
+
+
+@pytest.mark.anyio
+async def test_404_no_framework_leak(client):
+    r = await client.get("/wp-login.php")
+    assert r.status_code == 404
+    assert "detail" not in r.text
+    assert "Not Found" not in r.text
 
 
 # --- Rate limit cleanup ---

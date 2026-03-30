@@ -12,9 +12,15 @@ from html import escape
 from fastapi import FastAPI, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
+from starlette.exceptions import HTTPException
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 templates = Jinja2Templates(directory="templates")
+
+
+@app.exception_handler(HTTPException)
+async def custom_http_error(request: Request, exc: HTTPException):
+    return HTMLResponse("", status_code=exc.status_code)
 
 messages: deque[dict] = deque(maxlen=200)
 msg_counter: int = 0
@@ -58,7 +64,8 @@ class BodyLimitMiddleware:
             nonlocal sent_413
             if too_large and not sent_413:
                 sent_413 = True
-                await send({"type": "http.response.start", "status": 413, "headers": []})
+                await send({"type": "http.response.start", "status": 413,
+                            "headers": list(SECURITY_HEADERS)})
                 await send({"type": "http.response.body", "body": b"", "more_body": False})
                 return
             if sent_413:
