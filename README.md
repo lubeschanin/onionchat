@@ -1,5 +1,7 @@
 # onionchat
 
+[![tests](https://github.com/lubeschanin/onionchat/actions/workflows/test.yml/badge.svg)](https://github.com/lubeschanin/onionchat/actions/workflows/test.yml)
+
 Minimal anonymous chat server for Tor Onion Services.
 
 No JavaScript. No WebSocket. No database. No bloat. One Python file.
