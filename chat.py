@@ -213,6 +213,11 @@ async def msg_feed(request: Request):
     global active_streams
     if active_streams >= MAX_STREAMS:
         return HTMLResponse(FULL_HTML)
+    # Reserve slot immediately, not inside the generator — prevents race condition
+    # where concurrent requests pass the check before generators start.
+    # Release is in the generator's finally block. ASGI guarantees the generator
+    # is always started (via StreamingResponse.__call__) and aclose()d on disconnect,
+    # so the finally block always runs.
     active_streams += 1
 
     async def generate():

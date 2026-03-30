@@ -7,6 +7,7 @@ import time
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from starlette.responses import HTMLResponse, StreamingResponse
 
 import chat
 
@@ -267,32 +268,36 @@ async def test_stream_limit(client):
     assert "Chat full" in r.text
 
 
-def test_stream_slot_reserved_before_generator():
-    """Verify active_streams is incremented before StreamingResponse is returned,
-    not inside the generator. This prevents race conditions under concurrent load."""
+@pytest.mark.anyio
+async def test_stream_slot_reserved_immediately():
+    """Verify active_streams is incremented before the generator starts,
+    preventing race conditions under concurrent load."""
+    from starlette.requests import Request
+
+    scope = {"type": "http", "method": "GET", "path": "/messages",
+             "query_string": b"", "headers": []}
+    request = Request(scope)
+
     chat.active_streams = 0
+    old_max = chat.MAX_STREAMS
+    chat.MAX_STREAMS = 2
+    try:
+        # First call: slot reserved immediately, before generator runs
+        r1 = await chat.msg_feed(request)
+        assert isinstance(r1, StreamingResponse)
+        assert chat.active_streams == 1
 
-    # After msg_feed returns StreamingResponse, active_streams must already be 1
-    # even though the generator hasn't started yet.
-    # We verify this by checking the code structure: the increment is outside the generator.
-    source = inspect.getsource(chat.msg_feed)
-    lines = source.split("\n")
+        # Second call: still room
+        r2 = await chat.msg_feed(request)
+        assert isinstance(r2, StreamingResponse)
+        assert chat.active_streams == 2
 
-    # Find the increment line and the generator definition
-    increment_line = None
-    generator_line = None
-    for i, line in enumerate(lines):
-        if "active_streams += 1" in line:
-            increment_line = i
-        if "async def generate" in line:
-            generator_line = i
-
-    assert increment_line is not None, "active_streams += 1 not found"
-    assert generator_line is not None, "generator not found"
-    assert increment_line < generator_line, (
-        f"active_streams += 1 (line {increment_line}) must come before "
-        f"async def generate (line {generator_line}) to prevent race conditions"
-    )
+        # Third call: full — no slot reserved
+        r3 = await chat.msg_feed(request)
+        assert isinstance(r3, HTMLResponse)
+        assert chat.active_streams == 2  # unchanged
+    finally:
+        chat.MAX_STREAMS = old_max
 
 
 # --- Notify ---
