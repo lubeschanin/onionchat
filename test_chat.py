@@ -173,6 +173,18 @@ async def test_duplicate_after_delay_allowed(client):
 
 
 @pytest.mark.anyio
+async def test_duplicate_blocked_even_with_other_nick_between(client):
+    client.cookies.set("nick", "Owl-cc33")
+    await client.post("/send", data={"msg": "spam"})
+    client.cookies.set("nick", "Fox-dd44")
+    chat.last_sent["Fox-dd44"] = 0
+    await client.post("/send", data={"msg": "other"})
+    client.cookies.set("nick", "Owl-cc33")
+    await client.post("/send", data={"msg": "spam"})
+    assert sum(1 for m in chat.messages if m["text"] == "spam") == 1
+
+
+@pytest.mark.anyio
 async def test_duplicate_from_different_nick_allowed(client):
     client.cookies.set("nick", "Fox-dd44")
     await client.post("/send", data={"msg": "hello"})

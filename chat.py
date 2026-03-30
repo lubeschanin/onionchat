@@ -278,8 +278,8 @@ async def send(request: Request, msg: str = Form("")):
     nick = get_or_set_nick(request, response)
     text = msg.strip()[:MAX_MSG_LEN]
     now = time.monotonic()
-    last = messages[-1] if messages else None
-    is_dup = (last and last["nick"] == nick and last["text"] == text
+    last_from_nick = next((m for m in reversed(messages) if m["nick"] == nick), None)
+    is_dup = (last_from_nick and last_from_nick["text"] == text
               and now - last_sent.get(nick, 0) < 30)
     if text and not is_dup and now - last_sent.get(nick, 0) >= RATE_LIMIT:
         last_sent[nick] = now
