@@ -98,6 +98,18 @@ cat /var/lib/tor/onionchat/hostname
 | `CLEAR_SECRET` | random (printed on startup) | Secret for `/clear` endpoint |
 | `MAX_STREAMS` | `100` | Max concurrent streaming connections |
 
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | Main page |
+| `GET` | `/messages` | Streaming message feed (long-lived connection) |
+| `GET` | `/input` | Input form |
+| `GET` | `/clock` | UTC clock |
+| `POST` | `/send` | Send a message (form data: `msg`) |
+| `GET` | `/status` | JSON: `{"streams": N, "messages": N}` |
+| `GET` | `/clear?secret=<s>` | Clear all messages (operator only) |
+
 ## Security
 
 Full security audit: [`AUDIT.md`](AUDIT.md)
@@ -145,14 +157,14 @@ Full security audit: [`AUDIT.md`](AUDIT.md)
 uv run pytest
 ```
 
-22 tests covering XSS, rate limiting, cookie validation, security headers, stream limits, and more.
+24 tests covering XSS, rate limiting, cookie validation, security headers, stream limits, and more.
 
 ## Project structure
 
 ```
 onionchat/
-├── chat.py              # Server (285 lines)
-├── test_chat.py         # Tests (22 tests)
+├── chat.py              # Server (304 lines)
+├── test_chat.py         # Tests (24 tests)
 ├── templates/
 │   └── chat.html        # Outer layout (iframe shell)
 ├── pyproject.toml

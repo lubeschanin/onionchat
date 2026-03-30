@@ -1,7 +1,7 @@
 # Security Audit — onionchat
 
 **Date:** 2026-03-29
-**Scope:** `chat.py` (286 lines), `templates/chat.html` (23 lines), `test_chat.py` (239 lines)
+**Scope:** `chat.py` (304 lines), `templates/chat.html` (23 lines), `test_chat.py` (257 lines)
 **Threat model:** Anonymous chat over Tor. Adversaries: malicious chat participants, network observers, automated scanners.
 
 ---
@@ -133,7 +133,7 @@
 
 | Risk | Severity | Rationale |
 |---|---|---|
-| Nickname collision | **Low** | 24 words x 65536 suffixes = ~1.6M combinations. Collision unlikely at 100 users. Not security-critical — nicknames are cosmetic. |
+| Nickname collision | **Low** | 100 words x 65536 suffixes = ~6.5M combinations. Collision unlikely at 100 users. Not security-critical — nicknames are cosmetic. |
 | Rate limit bypass via cookie deletion | **Low** | User can clear cookie, get new nick, bypass rate limit. Acceptable — Tor circuit creation is slower than 1 msg/s anyway. |
 | No CSRF protection on `/send` | **Low** | `SameSite=Strict` cookie prevents cross-origin form submission. CSP `form-action 'self'` adds defense in depth. |
 | Streaming connection drop | **Low** | If the stream drops silently (no `is_disconnected` trigger), the generator leaks until the next ping timeout (30s). `finally` block then cleans up. |
@@ -159,7 +159,7 @@ No external runtime requests. No CDN. No telemetry. Attack surface limited to in
 ## 9. Test Summary
 
 ```
-22 tests, 0.22s
+24 tests, 0.25s
 
 Nickname:       test_make_nick_format, test_make_nick_unique
 Pages:          test_index, test_input, test_clock
@@ -173,6 +173,7 @@ Clear:          test_clear_wrong_secret, test_clear_correct_secret
 Headers:        test_security_headers
 Docs:           test_docs_disabled
 Streams:        test_stream_limit
+Status:         test_status_empty, test_status_with_messages
 Events:         test_notify_wakes_waiters
 ```
 
