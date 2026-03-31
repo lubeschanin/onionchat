@@ -40,7 +40,7 @@ Messages are pushed via HTTP streaming (`StreamingResponse`). No polling, no ref
 - **Real-time delivery** — messages pushed via `asyncio.Event`, not polling
 - **Ephemeral** — in-memory ring buffer (200 messages). Process dies, everything is gone. That's the point.
 - **JSON API** — `GET /api/messages` and `GET /api/status` for programmatic access
-- **Hardened** — CSP, rate limiting, body size limit, constant-time secret comparison ([full audit](AUDIT.md))
+- **Hardened** — CSP, rate limiting, body size limit, duplicate filter, HTTP timeouts ([full audit](AUDIT.md))
 
 ## Architecture
 
@@ -132,10 +132,12 @@ The `/api/status` endpoint exposes all limits and hardening settings transparent
 | XSS | `html.escape()` on all user content, CSP blocks all scripts |
 | Body size | ASGI middleware rejects request bodies >2 KB (413) |
 | Rate limiting | 1 msg/s per nickname |
+| Duplicate filter | Same text from same nick blocked within 30s |
 | Message length | 500 chars max |
-| Stream limit | 100 concurrent connections |
+| Stream limit | 100 concurrent connections (immediate slot reservation) |
+| Stream delivery | Event captured before snapshot — no missed messages |
 | Cookie validation | Regex-validated, invalid cookies replaced |
-| No fingerprint | Docs disabled, server header masked |
+| No fingerprint | Docs disabled, server header masked, empty 404 |
 | No logging | `access_log=False`, no IP addresses stored |
 | Middleware | Raw ASGI (not `BaseHTTPMiddleware`) to avoid buffering streams |
 
@@ -148,6 +150,7 @@ The `/api/status` endpoint exposes all limits and hardening settings transparent
 | Request body | 2 KB |
 | Concurrent streams | 100 |
 | Rate limit | 1 msg/s per nick |
+| Duplicate window | 30s |
 
 ## Tests
 
@@ -177,7 +180,7 @@ No JavaScript. No WebSocket. No database. No accounts. No rooms. No DMs. No file
 
 ## See also
 
-- [onionchat-go](https://github.com/lubeschanin/onionchat-go) — Go implementation (single binary, zero dependencies, 488 lines, 32 tests)
+- [onionchat-go](https://github.com/lubeschanin/onionchat-go) — Go implementation (single binary, zero dependencies, 502 lines, 29 tests)
 
 ## License
 
