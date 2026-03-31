@@ -182,6 +182,10 @@ onionchat/
 
 No JavaScript. No WebSocket. No database. No accounts. No rooms. No DMs. No file uploads. No CDN. No external requests. No CORS. No TLS (Tor handles encryption). No IP logging. No frameworks beyond FastAPI.
 
+## See also
+
+- [onionchat-go](https://github.com/lubeschanin/onionchat-go) — Go implementation (single binary, zero dependencies, 488 lines, 32 tests)
+
 ## License
 
 MIT
