@@ -241,7 +241,7 @@ async def test_404_no_framework_leak(client):
 
 
 def test_clean_rate_limits():
-    chat.last_sent["old"] = time.monotonic() - 10
+    chat.last_sent["old"] = time.monotonic() - 60
     chat.last_sent["new"] = time.monotonic()
     chat._clean_rate_limits()
     assert "old" not in chat.last_sent

@@ -159,8 +159,8 @@ def render_msg(m: dict) -> str:
 
 
 def _clean_rate_limits():
-    """Remove entries older than 2x RATE_LIMIT."""
-    cutoff = time.monotonic() - RATE_LIMIT * 2
+    """Remove entries older than the duplicate window."""
+    cutoff = time.monotonic() - 30
     expired = [k for k, v in last_sent.items() if v < cutoff]
     for k in expired:
         del last_sent[k]
