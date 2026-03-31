@@ -6,6 +6,8 @@ Minimal anonymous chat server for Tor Onion Services.
 
 No JavaScript. No WebSocket. No database. No bloat. One Python file.
 
+![onionchat in Tor Browser](screenshot.png)
+
 ## Quickstart
 
 ```bash
