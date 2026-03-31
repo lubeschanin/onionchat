@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-30
 **Type:** Self-audit (not an independent security review)
-**Scope:** `chat.py` (346 lines), `templates/chat.html` (30 lines), `test_chat.py` (378 lines)
+**Scope:** `chat.py` (345 lines), `templates/chat.html` (30 lines), `test_chat.py` (392 lines)
 **Threat model:** Anonymous chat over Tor. Adversaries: malicious chat participants, network observers, automated scanners.
 
 ### Confidence levels
@@ -28,7 +28,6 @@
 | Cookie nickname | **TESTED** | Validated against `^[A-Za-z]{2,10}-[0-9a-f]{4}$`. Invalid cookies replaced with server-generated nick. |
 | Form data body | **TESTED** | `BodyLimitMiddleware` rejects bodies >2 KB at ASGI level. Returns 413 with security headers. |
 | HTTP headers | **INSPECTED** | `h11_max_incomplete_event_size=16KB` limits header size at protocol level. Not tested — depends on uvicorn/h11 internals. |
-| Query parameters | **INSPECTED** | `/clear` secret compared with `secrets.compare_digest()`. Code uses constant-time comparison, but no timing test proves it. |
 
 ### Tests
 
@@ -134,13 +133,10 @@ Read-only, bounded payload (~20 KB max). Tor latency (200-1000ms) is the natural
 | Concern | Status | Detail |
 |---|---|---|
 | Nickname spoofing | **MITIGATED** | Cookie is `httponly` + `samesite=strict`. Server validates format. No `Secure` flag — server binds `127.0.0.1` (plain HTTP), Tor encrypts the transport. |
-| Clear endpoint | **INSPECTED** | Protected by `CLEAR_SECRET` with `secrets.compare_digest()`. Code uses constant-time comparison, but no timing test verifies it. 64 bits of entropy via `secrets.token_hex(8)`. |
 | Session fixation | **N/A** | No sessions. Cookie is a display name only, not an auth token. |
 
 ### Tests
 
-- `test_clear_wrong_secret` — wrong secret does not clear
-- `test_clear_correct_secret` — correct secret clears
 - `test_send_preserves_existing_nick` — valid cookie kept
 - `test_invalid_cookie_gets_new_nick` — invalid cookie replaced
 
@@ -154,13 +150,11 @@ Read-only, bounded payload (~20 KB max). Tor latency (200-1000ms) is the natural
 | Event notification | **INSPECTED** | `notify()` replaces `msg_event` and sets old. Generators capture reference before `await`. Appears correct by inspection. |
 | Deque iteration | **INSPECTED** | `list(messages)` snapshots before iterating. Safe against concurrent modification in asyncio context. |
 | `msg_counter` overflow | **INSPECTED** | Python `int` has arbitrary precision. |
-| `/clear` + streaming | **TESTED** | `msg_counter` not reset on clear. New messages get higher IDs. |
 | Stream slot reservation | **TESTED** | Slot reserved before generator creation. Counter correct at capacity. |
 
 ### Tests
 
 - `test_notify_wakes_waiters` — event notification works
-- `test_clear_preserves_msg_counter` — counter survives clear, new messages get correct IDs
 - `test_stream_slot_reserved_immediately` — immediate reservation, correct rejection
 
 ### Not tested
@@ -220,7 +214,7 @@ No external runtime requests. No CDN. No telemetry. Attack surface limited to in
 ## 10. Test Summary
 
 ```
-34 tests, 0.24s
+35 tests, 0.30s
 
 Nickname:       test_make_nick_format, test_make_nick_unique
 Pages:          test_index, test_input, test_clock
@@ -230,8 +224,6 @@ XSS:            test_xss_escaped
 Limits:         test_message_truncated, test_ring_buffer
 Rate limiting:  test_rate_limit, test_rate_limit_expires, test_clean_rate_limits
 Cookie:         test_invalid_cookie_gets_new_nick, test_too_long_cookie_gets_new_nick
-Clear:          test_clear_wrong_secret, test_clear_correct_secret,
-                test_clear_preserves_msg_counter
 Body limit:     test_body_limit_rejects_large_post, test_body_limit_has_security_headers
 Fingerprint:    test_404_no_framework_leak
 Headers:        test_security_headers

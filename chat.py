@@ -110,8 +110,6 @@ class SecurityHeadersMiddleware:
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(BodyLimitMiddleware)
 
-CLEAR_SECRET = os.environ.get("CLEAR_SECRET", secrets.token_hex(8))
-
 WORDS = [
     "Ash", "Bark", "Bear", "Blade", "Blaze", "Bolt", "Bone", "Briar",
     "Brook", "Cairn", "Cave", "Cinder", "Claw", "Clay", "Cliff", "Cloud",
@@ -250,13 +248,16 @@ async def msg_feed(request: Request):
         try:
             yield MSG_HEAD
 
+            # Capture event BEFORE snapshot to close the race window —
+            # any message arriving between snapshot and wait will
+            # still trigger this event.
+            event = msg_event
             last_id = -1
             for m in list(messages):
                 yield render_msg(m)
                 last_id = m["id"]
 
             while True:
-                event = msg_event
                 try:
                     await asyncio.wait_for(event.wait(), timeout=30)
                 except asyncio.TimeoutError:
@@ -332,18 +333,8 @@ async def api_status():
     }
 
 
-@app.get("/clear")
-async def clear(secret: str = ""):
-    if secrets.compare_digest(secret, CLEAR_SECRET):
-        # msg_counter is intentionally NOT reset — streaming generators track
-        # last_id, so a reset would cause them to miss new messages.
-        messages.clear()
-    return RedirectResponse("/", status_code=303)
-
-
 if __name__ == "__main__":
     import uvicorn
-    print(f"[*] Clear-URL: /clear?secret={CLEAR_SECRET}")
     uvicorn.run(
         app,
         host="127.0.0.1",

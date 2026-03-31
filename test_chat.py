@@ -213,31 +213,6 @@ async def test_too_long_cookie_gets_new_nick(client):
 # --- Clear ---
 
 
-@pytest.mark.anyio
-async def test_clear_wrong_secret(client):
-    await client.post("/send", data={"msg": "hi"})
-    await client.get("/clear?secret=wrong", follow_redirects=False)
-    assert len(chat.messages) == 1
-
-
-@pytest.mark.anyio
-async def test_clear_correct_secret(client):
-    await client.post("/send", data={"msg": "hi"})
-    await client.get(f"/clear?secret={chat.CLEAR_SECRET}", follow_redirects=False)
-    assert len(chat.messages) == 0
-
-
-@pytest.mark.anyio
-async def test_clear_preserves_msg_counter(client):
-    await client.post("/send", data={"msg": "before"})
-    counter_before = chat.msg_counter
-    await client.get(f"/clear?secret={chat.CLEAR_SECRET}", follow_redirects=False)
-    assert chat.msg_counter == counter_before
-    chat.last_sent.clear()
-    await client.post("/send", data={"msg": "after"})
-    assert chat.messages[0]["id"] == counter_before
-
-
 # --- Body limit ---
 
 

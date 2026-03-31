@@ -72,11 +72,7 @@ Or manually:
 uv run chat.py
 ```
 
-On startup, the clear URL is printed to stdout:
-
-```
-[*] Clear-URL: /clear?secret=<random>
-```
+To clear all messages, restart the process.
 
 ### Run as Tor Hidden Service
 
@@ -98,7 +94,6 @@ cat /var/lib/tor/onionchat/hostname
 
 | Variable | Default | Description |
 |---|---|---|
-| `CLEAR_SECRET` | random (printed on startup) | Secret for `/clear` endpoint |
 | `MAX_STREAMS` | `100` | Max concurrent streaming connections |
 
 ## Endpoints
@@ -111,7 +106,6 @@ cat /var/lib/tor/onionchat/hostname
 | `POST` | `/send` | Send a message (form data: `msg`) |
 | `GET` | `/api/messages` | JSON array of all messages (ISO 8601 timestamps) |
 | `GET` | `/api/status` | JSON: streams, messages, limits, hardening config |
-| `GET` | `/clear?secret=<s>` | Clear all messages (operator only) |
 
 ## Security
 
@@ -141,7 +135,6 @@ The `/api/status` endpoint exposes all limits and hardening settings transparent
 | Message length | 500 chars max |
 | Stream limit | 100 concurrent connections |
 | Cookie validation | Regex-validated, invalid cookies replaced |
-| Clear endpoint | Constant-time secret comparison |
 | No fingerprint | Docs disabled, server header masked |
 | No logging | `access_log=False`, no IP addresses stored |
 | Middleware | Raw ASGI (not `BaseHTTPMiddleware`) to avoid buffering streams |
@@ -162,14 +155,14 @@ The `/api/status` endpoint exposes all limits and hardening settings transparent
 uv run pytest
 ```
 
-34 tests covering XSS, rate limiting, cookie validation, security headers, stream limits, body limits, API endpoints, and more.
+35 tests covering XSS, rate limiting, duplicate filter, cookie validation, security headers, stream limits, body limits, API endpoints, and more.
 
 ## Project structure
 
 ```
 onionchat/
-├── chat.py              # Server (346 lines)
-├── test_chat.py         # Tests (34 tests)
+├── chat.py              # Server (345 lines)
+├── test_chat.py         # Tests (35 tests)
 ├── templates/
 │   └── chat.html        # Outer layout (iframe shell)
 ├── pyproject.toml
