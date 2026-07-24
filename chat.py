@@ -31,6 +31,24 @@ MAX_MSG_LEN: int = 500
 RATE_LIMIT: float = 1.0  # seconds between messages
 last_sent: dict[str, float] = {}
 
+# Global flood backstop: the per-nick limit is cookie-based and thus
+# forgeable (delete cookie -> new nick). Token bucket caps total throughput.
+GLOBAL_RATE: float = 5.0  # messages/second across all nicks
+GLOBAL_BURST: float = 10.0
+_tokens: float = GLOBAL_BURST
+_tokens_at: float = time.monotonic()
+
+
+def _take_token() -> bool:
+    global _tokens, _tokens_at
+    now = time.monotonic()
+    _tokens = min(GLOBAL_BURST, _tokens + (now - _tokens_at) * GLOBAL_RATE)
+    _tokens_at = now
+    if _tokens < 1.0:
+        return False
+    _tokens -= 1.0
+    return True
+
 NICK_RE = re.compile(r"^[A-Za-z]{2,10}-[0-9a-f]{4}$")
 
 MAX_BODY: int = 2048
@@ -46,19 +64,30 @@ class BodyLimitMiddleware:
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
 
-        received = 0
         too_large = False
         sent_413 = False
 
         async def limited_receive():
-            nonlocal received, too_large
+            # Buffer the complete body (bounded by MAX_BODY) before handing
+            # it to the app. Passing chunks through individually would let
+            # the app parse a truncated form when a later chunk crosses the
+            # limit — a partial message would be posted despite the 413.
+            nonlocal too_large
             message = await receive()
-            if message["type"] == "http.request":
-                received += len(message.get("body", b""))
-                if received > MAX_BODY:
-                    too_large = True
-                    return {"type": "http.request", "body": b"", "more_body": False}
-            return message
+            if message["type"] != "http.request":
+                return message
+            chunks = [message.get("body", b"")]
+            total = len(chunks[0])
+            while total <= MAX_BODY and message.get("more_body"):
+                message = await receive()
+                if message["type"] != "http.request":
+                    return message
+                chunks.append(message.get("body", b""))
+                total += len(chunks[-1])
+            if total > MAX_BODY:
+                too_large = True
+                return {"type": "http.request", "body": b"", "more_body": False}
+            return {"type": "http.request", "body": b"".join(chunks), "more_body": False}
 
         async def checked_send(message):
             nonlocal sent_413
@@ -82,7 +111,8 @@ SECURITY_HEADERS: list[tuple[bytes, bytes]] = [
     (b"cache-control", b"no-store"),
     (b"permissions-policy", b"camera=(), microphone=(), geolocation=(), interest-cohort=()"),
     (b"content-security-policy",
-     b"default-src 'none'; style-src 'unsafe-inline'; frame-src 'self'; form-action 'self'; img-src 'self'"),
+     b"default-src 'none'; style-src 'unsafe-inline'; frame-src 'self'; "
+     b"frame-ancestors 'self'; form-action 'self'; img-src 'self'; base-uri 'none'"),
     (b"server", b"onionchat"),
 ]
 
@@ -292,7 +322,9 @@ async def send(request: Request, msg: str = Form("")):
     last_from_nick = next((m for m in reversed(messages) if m["nick"] == nick), None)
     is_dup = (last_from_nick and last_from_nick["text"] == text
               and now - last_sent.get(nick, 0) < 30)
-    if text and not is_dup and now - last_sent.get(nick, 0) >= RATE_LIMIT:
+    if (text and not is_dup
+            and now - last_sent.get(nick, 0) >= RATE_LIMIT
+            and _take_token()):
         last_sent[nick] = now
         messages.append({
             "id": msg_counter,
@@ -322,6 +354,7 @@ async def api_status():
             "max_message_length": MAX_MSG_LEN,
             "max_body_bytes": MAX_BODY,
             "rate_limit_seconds": RATE_LIMIT,
+            "global_rate_per_second": GLOBAL_RATE,
             "message_buffer": messages.maxlen,
         },
         "hardening": {

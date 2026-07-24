@@ -25,7 +25,7 @@ Sister project: [onionchat-go](https://github.com/lubeschanin/onionchat-go)
 ```bash
 ./start.sh              # Start server
 uv run chat.py          # Alternative start
-uv run pytest           # Run 35 tests
+uv run pytest           # Run 38 tests
 uv run pytest -v        # Verbose
 ```
 
@@ -34,6 +34,7 @@ uv run pytest -v        # Verbose
 - No `/clear` endpoint — restart to clear. Eliminates secret management.
 - `active_streams` incremented before generator, decremented in `finally`
 - Duplicate filter: per-nick, 30s window, survives interleaved messages
+- Global token bucket (5 msg/s, burst 10) as flood backstop — per-nick limits are cookie-forgeable
 - Cleanup cutoff uses 30s (duplicate window), not 2s (rate limit)
 - Cookie: httponly, samesite=strict, no Secure flag (plain HTTP, Tor encrypts)
 - All timestamps stored ISO 8601, rendered HH:MM in UI

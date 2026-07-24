@@ -19,6 +19,8 @@ def _reset_state():
     chat.last_sent.clear()
     chat.active_streams = 0
     chat.msg_event = asyncio.Event()
+    chat._tokens = chat.GLOBAL_BURST
+    chat._tokens_at = time.monotonic()
     yield
 
 
@@ -184,6 +186,17 @@ async def test_duplicate_blocked_even_with_other_nick_between(client):
 
 
 @pytest.mark.anyio
+async def test_global_rate_limit_backstop(client):
+    """Cookie rotation bypasses the per-nick limit; the global token
+    bucket caps total throughput regardless of nick."""
+    chat._tokens = 3.0
+    for i in range(6):
+        client.cookies.set("nick", f"Fox-{i:04d}")
+        await client.post("/send", data={"msg": f"m{i}"})
+    assert len(chat.messages) == 3
+
+
+@pytest.mark.anyio
 async def test_duplicate_from_different_nick_allowed(client):
     client.cookies.set("nick", "Fox-dd44")
     await client.post("/send", data={"msg": "hello"})
@@ -220,6 +233,34 @@ async def test_too_long_cookie_gets_new_nick(client):
 async def test_body_limit_rejects_large_post(client):
     r = await client.post("/send", data={"msg": "A" * 3000}, follow_redirects=False)
     assert r.status_code == 413
+    assert len(chat.messages) == 0
+
+
+@pytest.mark.anyio
+async def test_body_limit_chunked_no_side_effect():
+    """A chunked body that crosses the limit mid-stream must not leak a
+    truncated form into the app — 413 and no message posted."""
+    sent = []
+    parts = iter([
+        {"type": "http.request", "body": b"msg=" + b"A" * 1996, "more_body": True},
+        {"type": "http.request", "body": b"B" * 1000, "more_body": False},
+    ])
+
+    async def receive():
+        return next(parts)
+
+    async def send(message):
+        sent.append(message)
+
+    scope = {"type": "http", "http_version": "1.1", "method": "POST",
+             "scheme": "http", "path": "/send", "raw_path": b"/send",
+             "query_string": b"", "root_path": "",
+             "headers": [(b"content-type", b"application/x-www-form-urlencoded"),
+                         (b"content-length", b"3000")],
+             "client": ("127.0.0.1", 1234), "server": ("127.0.0.1", 8181)}
+    await chat.app(scope, receive, send)
+    assert sent[0]["status"] == 413
+    assert len(chat.messages) == 0
 
 
 @pytest.mark.anyio
@@ -259,6 +300,8 @@ async def test_security_headers(client):
     assert r.headers["x-frame-options"] == "SAMEORIGIN"
     assert "camera=()" in r.headers["permissions-policy"]
     assert "default-src 'none'" in r.headers["content-security-policy"]
+    assert "frame-ancestors 'self'" in r.headers["content-security-policy"]
+    assert "base-uri 'none'" in r.headers["content-security-policy"]
     assert r.headers["server"] == "onionchat"
 
 

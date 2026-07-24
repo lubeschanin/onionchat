@@ -26,7 +26,7 @@
 | Message text (XSS) | **TESTED** | `html.escape()` on nick, time, text in `render_msg()`. Jinja2 auto-escaping on `chat.html`. No `\|safe` filters. |
 | Message length | **TESTED** | Server truncates at 500 chars (`msg.strip()[:MAX_MSG_LEN]`). HTML `maxlength="500"` on input. |
 | Cookie nickname | **TESTED** | Validated against `^[A-Za-z]{2,10}-[0-9a-f]{4}$`. Invalid cookies replaced with server-generated nick. |
-| Form data body | **TESTED** | `BodyLimitMiddleware` rejects bodies >2 KB at ASGI level. Returns 413 with security headers. |
+| Form data body | **TESTED** | `BodyLimitMiddleware` buffers the complete body (bounded by 2 KB) before the app sees it; oversized bodies return 413 with security headers and no side effects — the app never parses a truncated form. |
 | HTTP headers | **INSPECTED** | `h11_max_incomplete_event_size=16KB` limits header size at protocol level. Not tested — depends on uvicorn/h11 internals. |
 
 ### Tests
@@ -44,7 +44,7 @@
 
 | Header | Value | Purpose |
 |---|---|---|
-| `Content-Security-Policy` | `default-src 'none'; style-src 'unsafe-inline'; frame-src 'self'; form-action 'self'` | Blocks scripts, images, external resources |
+| `Content-Security-Policy` | `default-src 'none'; style-src 'unsafe-inline'; frame-src 'self'; frame-ancestors 'self'; form-action 'self'; img-src 'self'; base-uri 'none'` | Blocks scripts, external resources, framing by other origins, `<base>` injection |
 | `X-Content-Type-Options` | `nosniff` | Prevents MIME-type sniffing |
 | `X-Frame-Options` | `SAMEORIGIN` | Prevents clickjacking from external sites |
 | `Referrer-Policy` | `no-referrer` | No `.onion` address leakage via referrer |
@@ -73,10 +73,11 @@ Raw ASGI middleware (`SecurityHeadersMiddleware`), not `BaseHTTPMiddleware`. Thi
 |---|---|---|
 | Stream exhaustion | `active_streams` counter with immediate reservation | 100 (configurable via `MAX_STREAMS`) |
 | Message spam | Per-nick rate limit via `last_sent` dict | 1 msg/s per nick |
+| Message flood (nick rotation) | Global token bucket `_take_token()` — backstop, since per-nick limits are cookie-forgeable | 5 msg/s total, burst 10 |
 | Large POST body | `BodyLimitMiddleware` at ASGI level | 2 KB |
 | Large HTTP headers | `h11_max_incomplete_event_size` | 16 KB |
 | Memory via messages | `deque(maxlen=200)` ring buffer | 200 messages max |
-| Memory via rate-limit dict | `_clean_rate_limits()` called when >256 entries | Entries >2s old evicted |
+| Memory via rate-limit dict | `_clean_rate_limits()` called when >256 entries | Entries >30s old evicted; growth rate bounded by global token bucket |
 
 ### `/api/messages` — no rate limit (intentional)
 
@@ -95,6 +96,8 @@ Read-only, bounded payload (~20 KB max). Tor latency (200-1000ms) is the natural
 - `test_stream_slot_reserved_immediately` — counter increments before generator runs, rejection at capacity works
 - `test_rate_limit` — second message within 1s is dropped
 - `test_rate_limit_expires` — message accepted after limit expires
+- `test_global_rate_limit_backstop` — nick rotation capped by global token bucket
+- `test_body_limit_chunked_no_side_effect` — chunked body crossing the limit posts nothing
 - `test_ring_buffer` — deque evicts oldest at 200
 - `test_clean_rate_limits` — expired entries removed, recent entries kept
 
@@ -187,7 +190,7 @@ Both endpoints are public and read-only. No internal state (`id`, `msg_counter`)
 | Risk | Severity | Rationale |
 |---|---|---|
 | Nickname collision | **Low** | 100 words x 65536 suffixes = ~6.5M combinations. Cosmetic, not security-critical. |
-| Rate limit bypass via cookie deletion | **Low** | New nick bypasses rate limit. Tor circuit creation is slower than 1 msg/s. |
+| Rate limit bypass via cookie deletion | **Low** | New nick bypasses the per-nick limit and duplicate filter. Global token bucket (5 msg/s) caps total flood throughput; a determined attacker can still fill the 200-message ring buffer in ~40s. Accepted: any anonymous service without IPs has this property, and a stricter global limit would let one attacker mute the chat for everyone. |
 | No CSRF token on `/send` | **Low** | `SameSite=Strict` + CSP `form-action 'self'` as defense in depth. |
 | Stream slot leak | **Low** | Possible if generator never starts (requires ASGI server bug). ASGI spec guarantees response execution. |
 | `last_sent` cleanup timing | **Low** | Dict can hold up to 256 stale entries (~10 KB). Bounded and harmless. |
@@ -214,7 +217,7 @@ No external runtime requests. No CDN. No telemetry. Attack surface limited to in
 ## 10. Test Summary
 
 ```
-35 tests, 0.30s
+38 tests, ~1s
 
 Nickname:       test_make_nick_format, test_make_nick_unique
 Pages:          test_index, test_input, test_clock
@@ -222,13 +225,16 @@ Send/receive:   test_send_message, test_send_empty_ignored,
                 test_send_sets_nick_cookie, test_send_preserves_existing_nick
 XSS:            test_xss_escaped
 Limits:         test_message_truncated, test_ring_buffer
-Rate limiting:  test_rate_limit, test_rate_limit_expires, test_clean_rate_limits
+Rate limiting:  test_rate_limit, test_rate_limit_expires, test_clean_rate_limits,
+                test_global_rate_limit_backstop
 Cookie:         test_invalid_cookie_gets_new_nick, test_too_long_cookie_gets_new_nick
-Body limit:     test_body_limit_rejects_large_post, test_body_limit_has_security_headers
+Body limit:     test_body_limit_rejects_large_post, test_body_limit_chunked_no_side_effect,
+                test_body_limit_has_security_headers
 Fingerprint:    test_404_no_framework_leak
 Headers:        test_security_headers
 Docs:           test_docs_disabled
-Streams:        test_stream_limit, test_stream_slot_reserved_immediately
+Streams:        test_stream_limit, test_stream_slot_reserved_immediately,
+                test_stream_parks_after_delivery
 Events:         test_notify_wakes_waiters
 Timestamps:     test_render_msg_shows_only_hhmm
 API:            test_api_status_empty, test_api_status_with_messages,
