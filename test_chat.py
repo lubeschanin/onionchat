@@ -315,6 +315,52 @@ async def test_stream_slot_reserved_immediately():
         chat.MAX_STREAMS = old_max
 
 
+@pytest.mark.anyio
+async def test_stream_parks_after_delivery():
+    """Regression: after delivering a message, the stream loop must
+    re-subscribe to the new msg_event. Waiting on the stale (set) event
+    busy-loops — visible as unbounded is_disconnected checks."""
+    from starlette.requests import Request
+
+    receive_calls = 0
+
+    async def blocking_receive():
+        nonlocal receive_calls
+        receive_calls += 1
+        await asyncio.sleep(3600)
+        return {"type": "http.disconnect"}
+
+    scope = {"type": "http", "method": "GET", "path": "/messages",
+             "query_string": b"", "headers": []}
+    request = Request(scope, receive=blocking_receive)
+
+    resp = await chat.msg_feed(request)
+    gen = resp.body_iterator
+    chunks = []
+
+    async def consume():
+        async for c in gen:
+            chunks.append(c)
+
+    task = asyncio.create_task(consume())
+    try:
+        await asyncio.sleep(0.1)  # generator parks in event.wait()
+
+        chat.messages.append({"id": 0, "nick": "Fox-ab12",
+                              "time": "2026-01-01T00:00Z", "text": "hello"})
+        chat.msg_counter = 1
+        chat.notify()
+        await asyncio.sleep(0.1)
+        assert any("hello" in c for c in chunks)
+
+        receive_calls = 0
+        await asyncio.sleep(0.5)
+        # Parked generator: zero wake-ups. Busy loop: thousands.
+        assert receive_calls == 0
+    finally:
+        task.cancel()
+
+
 # --- Notify ---
 
 

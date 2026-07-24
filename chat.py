@@ -267,6 +267,11 @@ async def msg_feed(request: Request):
                     continue
                 if await request.is_disconnected():
                     break
+                # Re-subscribe before scanning: notify() replaces msg_event,
+                # so the woken event stays set forever — waiting on it again
+                # would busy-loop. Capturing before the scan keeps the
+                # no-missed-message invariant.
+                event = msg_event
                 for m in list(messages):
                     if m["id"] > last_id:
                         yield render_msg(m)
